@@ -5,6 +5,9 @@ import com.spzx.listener.ExcelListener;
 import com.spzx.mapper.ProductMapper;
 import com.spzx.model.Product;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.assertj.core.util.Files;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -22,13 +25,17 @@ public class MyApplicationRunner {
     private ExecutorService executorService;
 
     @Autowired
-    private ProductMapper mapper;
+    private SqlSessionFactory sqlSessionFactory;
+
+
+//    @Autowired
+//    private ProductMapper mapper;
 
     @EventListener
     public void onApplicationEvent(ContextRefreshedEvent event) {
         log.info("开始解析数据");
         String fileName = Files.currentFolder().getPath() + File.separator + "data" + File.separator + "data.xlsx";
         // D:\practice\ExcelProcessor\data\data.xlsx
-        EasyExcel.read(fileName, Product.class, new ExcelListener(executorService, mapper)).sheet().doRead();
+        EasyExcel.read(fileName, Product.class, new ExcelListener(executorService, sqlSessionFactory)).sheet().doRead();
     }
 }
