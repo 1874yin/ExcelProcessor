@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.spzx.mapper.ProductMapper" >
+
+
+    <insert id="insertBatchSomeColumn" parameterType="java.util.List">
+        INSERT INTO product (id, name, price)
+        VALUES
+        <foreach collection="list" item="item" index="index" separator=",">
+            (#{item.id}, #{item.name}, #{item.price})
+        </foreach>
+    </insert>
+</mapper>
