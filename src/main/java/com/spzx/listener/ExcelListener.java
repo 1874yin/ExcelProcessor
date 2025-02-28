@@ -16,7 +16,7 @@ import java.util.concurrent.ExecutorService;
 @Slf4j
 public class ExcelListener implements ReadListener<Product> {
 
-    private static final int BATCH_SIZE = 10000;             // 每1000条执行一次
+    private static final int BATCH_SIZE = 1000;             // 每1000条执行一次
     private List<Product> batchList = new ArrayList<>();    // 记录缓存
 
     // 该 Listener 不由 Spring 管理，因此 Bean 需要手动传入构造器中
@@ -54,11 +54,17 @@ public class ExcelListener implements ReadListener<Product> {
         log.info("------- 解析结束 -------");
     }
 
+    /**
+     * 使用 ExecutorType.SIMPLE 模式，单线程
+     */
     private void insertToDbSimple() {
         mapper.insertBatchSomeColumn(batchList);
         batchList.clear();
     }
 
+    /**
+     * 使用 ExecutorType.BATCH 模式，单线程
+     */
     public void insertToDbBatch() {
         SqlSession sqlSession = getBatchSqlSession(sqlSessionFactory);
         try {
@@ -75,6 +81,9 @@ public class ExcelListener implements ReadListener<Product> {
         batchList.clear();
     }
 
+    /**
+     * 使用 ExecutorType.SIMPLE 模式，多线程插入
+     */
     private void insertToDbSimpleThreadPool() {
         ArrayList<Product> newList = new ArrayList<>(batchList);
         batchList.clear();
@@ -84,6 +93,9 @@ public class ExcelListener implements ReadListener<Product> {
         });
     }
 
+    /**
+     * 使用 ExecutorType.BATCH 模式，多线程插入
+     */
     private void insertToDbBatchThreadPool() {
         ArrayList<Product> newList = new ArrayList<>(batchList);
         batchList.clear();
