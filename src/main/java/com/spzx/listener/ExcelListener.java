@@ -23,10 +23,18 @@ public class ExcelListener implements ReadListener<Product> {
     private final ExecutorService executorService;
     private final SqlSessionFactory sqlSessionFactory;
 
+    // 不使用 batch 模式
+    private ProductMapper mapper;
 
     public ExcelListener(ExecutorService executorService, SqlSessionFactory sqlSessionFactory) {
         this.sqlSessionFactory = sqlSessionFactory;
         this.executorService = executorService;
+    }
+
+    public ExcelListener(ExecutorService executorService, SqlSessionFactory sqlSessionFactory, ProductMapper mapper) {
+        this.executorService = executorService;
+        this.sqlSessionFactory = sqlSessionFactory;
+        this.mapper = mapper;
     }
 
     @Override
@@ -34,24 +42,53 @@ public class ExcelListener implements ReadListener<Product> {
 //        log.info("解析到数据：{}", JSON.toJSONString(product));
         batchList.add(product);
         if (batchList.size() >= BATCH_SIZE) {
-            insertToDbThreadPool();
+            insertToDbBatchThreadPool();
         }
     }
 
     @Override
     public void doAfterAllAnalysed(AnalysisContext analysisContext) {
         if (!batchList.isEmpty()) {
-            insertToDbThreadPool();
+            insertToDbBatchThreadPool();
         }
         log.info("------- 解析结束 -------");
     }
 
-    private void insertToDbThreadPool() {
+    private void insertToDbSimple() {
+        mapper.insertBatchSomeColumn(batchList);
+        batchList.clear();
+    }
+
+    public void insertToDbBatch() {
+        SqlSession sqlSession = getBatchSqlSession(sqlSessionFactory);
+        try {
+            ProductMapper mapper = sqlSession.getMapper(ProductMapper.class);
+            for (Product product : batchList) {
+                mapper.insert(product);
+            }
+            sqlSession.commit();
+        } catch (Exception e) {
+            sqlSession.rollback();
+        } finally {
+            sqlSession.close();
+        }
+        batchList.clear();
+    }
+
+    private void insertToDbSimpleThreadPool() {
         ArrayList<Product> newList = new ArrayList<>(batchList);
         batchList.clear();
         executorService.submit(() -> {
+            SqlSession sqlSession = getBatchSqlSession(sqlSessionFactory);
+            mapper.insertBatchSomeColumn(newList);
+        });
+    }
 
-            SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
+    private void insertToDbBatchThreadPool() {
+        ArrayList<Product> newList = new ArrayList<>(batchList);
+        batchList.clear();
+        executorService.submit(() -> {
+            SqlSession sqlSession = getBatchSqlSession(sqlSessionFactory);
             try {
                 ProductMapper mapper = sqlSession.getMapper(ProductMapper.class);
                 for (Product product : newList) {
@@ -66,20 +103,21 @@ public class ExcelListener implements ReadListener<Product> {
         });
     }
 
+    /**
+     * 获取 Batch 类型的 SqlSession
+     * @param sqlSessionFactory
+     * @return
+     */
+    private SqlSession getBatchSqlSession(SqlSessionFactory sqlSessionFactory) {
+        return sqlSessionFactory.openSession(ExecutorType.BATCH);
+    }
 
-    public void insertToDbSingleThread() {
-        SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
-        try {
-            ProductMapper mapper = sqlSession.getMapper(ProductMapper.class);
-            for (Product product : batchList) {
-                mapper.insert(product);
-            }
-            sqlSession.commit();
-        } catch (Exception e) {
-            sqlSession.rollback();
-        } finally {
-            sqlSession.close();
-        }
-        batchList.clear();
+    /**
+     * 获取 Simple 类型的 SqlSession
+     * @param sqlSessionFactory
+     * @return
+     */
+    private SqlSession getSimpleSqlSession(SqlSessionFactory sqlSessionFactory) {
+        return sqlSessionFactory.openSession(ExecutorType.SIMPLE);
     }
 }
